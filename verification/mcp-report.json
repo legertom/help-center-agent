@@ -1,20 +1,20 @@
 {
   "endpoint": "https://clever-support-tom-legers-projects.vercel.app/api/mcp",
-  "verifiedAt": "2026-09-07T15:01:14.975Z",
+  "verifiedAt": "2026-09-07T15:11:58.282Z",
   "initialization": {
     "name": "clever-support",
     "version": "2.0.0"
   },
-  "firstIndexedReadMs": 968,
+  "firstIndexedReadMs": 776,
   "warmIndexedReadMs": [
-    85,
-    86,
-    91,
-    69,
-    59
+    66,
+    57,
+    111,
+    61,
+    53
   ],
-  "searchMs": 737,
+  "searchMs": 1178,
   "searchMethod": "hybrid+rerank",
-  "answerMs": 8375,
+  "answerMs": 7740,
   "checks": "initialize, tools/list, structuredContent equivalence, full password procedure, search-to-reader, invalid URL/offset/language/revision, missing/incomplete articles, synthesized answer"
 }

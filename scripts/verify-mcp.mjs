@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 const endpoint = process.argv[2];
 if (!endpoint) throw new Error('Usage: node scripts/verify-mcp.mjs https://host/api/mcp');
@@ -59,3 +61,17 @@ await writeFile(new URL('answer-example.json',output),JSON.stringify(answer.data
 const report={endpoint,verifiedAt:new Date().toISOString(),initialization:initialization.result.serverInfo,firstIndexedReadMs:first.ms,warmIndexedReadMs:warm,searchMs:search.ms,searchMethod:search.data.method,answerMs:answer.ms,checks:'initialize, tools/list, structuredContent equivalence, full password procedure, search-to-reader, invalid URL/offset/language/revision, missing/incomplete articles, synthesized answer'};
 await writeFile(new URL('mcp-report.json',output),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
+
+// Exercise SDK output-schema validation, including structured tool errors.
+const client = new Client({ name: 'clever-sdk-verification', version: '1' });
+try {
+  await client.connect(new StreamableHTTPClientTransport(new URL(endpoint), { requestInit: { headers } }));
+  await client.listTools();
+  assert.equal((await client.callTool({ name: 'read_clever_article', arguments: { url } })).isError, false);
+  for (const { input, code } of errors) {
+    const result = await client.callTool({ name: 'read_clever_article', arguments: input });
+    assert.equal(result.isError, true); assert.equal(result.structuredContent.code, code);
+  }
+  assert.equal((await client.callTool({ name: 'read_clever_article', arguments: { url, offset: null } })).structuredContent.code, 'invalid_offset');
+  console.log('Official SDK success and structured-error validation passed.');
+} finally { await client.close(); }

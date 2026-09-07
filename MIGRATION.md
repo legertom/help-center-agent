@@ -35,6 +35,6 @@ The production domain is public and MCP has no bearer-key requirement.
 
 Initial live verification passed: all three MCP tools, exact 11-page article
 reconstruction, source procedures, structured/text equivalence and explicit errors.
-First indexed read: 968 ms (function coldness not independently guaranteed). Five
-warm reads: 59–91 ms including network round trip. Eight automated tests and
+First indexed read: 776 ms (function coldness not independently guaranteed). Five
+warm reads: 53–111 ms including network round trip. Nine automated tests and
 TypeScript checks pass; the patched dependency audit reports zero vulnerabilities.
