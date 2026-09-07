@@ -1,18 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "experimentalServices": {
-    "web": {
-      "entrypoint": ".",
-      "framework": "nextjs",
-      "routePrefix": "/"
-    },
-    "eve": {
-      "buildCommand": "eve build",
-      "entrypoint": ".",
-      "framework": "eve",
-      "routePrefix": "/_eve_internal/eve"
-    }
-  },
   "crons": [
     {
       "path": "/api/judge/batch",
@@ -25,6 +12,38 @@
     {
       "path": "/api/feedback-report",
       "schedule": "0 9 * * *"
+    }
+  ],
+  "services": {
+    "web": {
+      "root": ".",
+      "framework": "nextjs",
+      "buildCommand": "next build"
+    },
+    "eve": {
+      "root": ".",
+      "framework": "eve",
+      "buildCommand": "eve build"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/eve/:path*",
+      "destination": {
+        "service": "eve"
+      }
+    },
+    {
+      "source": "/.well-known/workflow/:path*",
+      "destination": {
+        "service": "eve"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
     }
   ]
 }

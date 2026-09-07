@@ -24,7 +24,7 @@ export const metadata = {
 };
 
 // Number of help-center articles in the knowledge base.
-const ARTICLE_COUNT = "525";
+const ARTICLE_COUNT = "534";
 const GITHUB_URL = "https://github.com/legertom/cs-agent-eve";
 
 const TOC = [

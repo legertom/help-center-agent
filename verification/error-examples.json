@@ -1,0 +1,52 @@
+[
+  {
+    "input": {
+      "url": "https://example.com"
+    },
+    "code": "invalid_url",
+    "error": "Only HTTPS support.clever.com article URLs are supported.",
+    "retryable": false
+  },
+  {
+    "input": {
+      "url": "https://support.clever.com/s/articles/000001612?language=en_US",
+      "offset": -1
+    },
+    "code": "invalid_offset",
+    "error": "offset must be a nonnegative safe integer (UTF-16 code units).",
+    "retryable": false
+  },
+  {
+    "input": {
+      "url": "https://support.clever.com/s/articles/000001612?language=es"
+    },
+    "code": "unsupported_language",
+    "error": "This corpus supports en_US only.",
+    "retryable": false
+  },
+  {
+    "input": {
+      "url": "https://support.clever.com/s/articles/000001612?language=en_US",
+      "revision": "outdated"
+    },
+    "code": "revision_changed",
+    "error": "The article revision changed. Restart at offset 0 without revision.",
+    "retryable": true
+  },
+  {
+    "input": {
+      "url": "https://support.clever.com/s/articles/999999999999"
+    },
+    "code": "not_found",
+    "error": "Article is not in the maintained corpus.",
+    "retryable": false
+  },
+  {
+    "input": {
+      "url": "https://support.clever.com/s/articles/000001577"
+    },
+    "code": "incomplete_extraction",
+    "error": "A verified full body is not available for this article.",
+    "retryable": true
+  }
+]

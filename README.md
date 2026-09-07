@@ -1,72 +1,57 @@
-# Discord Assistant (eve)
+# Clever Support
 
-A team assistant for Discord, built on [eve](https://eve.dev). It chats, answers
-questions, reads/summarizes links, and reports the time in any timezone.
+Clever-owned support app: Next.js frontend, eve agent, and a stateless MCP endpoint
+at `/api/mcp`. The phone demo should use `search_clever_kb` followed by
+`read_clever_article`. `ask_clever_support` remains available to existing clients.
+See [MCP.md](MCP.md) for the tool contract and [MIGRATION.md](MIGRATION.md) for ownership.
 
-## What's here
+## Development
 
-```
-agent/
-├── agent.ts                  # model + runtime config (Claude Sonnet 4.6)
-├── instructions.md           # system prompt / persona
-├── channels/
-│   ├── eve.ts                # built-in HTTP channel (local dev / TUI)
-│   └── discord.ts            # Discord Interactions channel
-└── tools/
-    ├── get_current_time.ts   # timezone-aware clock
-    └── read_url.ts           # fetch + read a web page (no API key)
-```
+Use Node 24. `npm ci`, then `vercel link --scope tom-legers-projects --project clever-support`
+and `vercel env pull .env.local`. Never point this checkout at the personal project.
+Run `npm run dev`. `npm run typecheck` and `npm test` verify the code.
 
-## Run locally
+## Deployment
 
-```bash
-npm run dev      # starts the eve dev server + TUI
-```
+`vercel deploy --prod --scope tom-legers-projects` builds both services. The current
+Vercel `services` configuration routes `/eve/*` and `/.well-known/workflow/*` to eve,
+and other paths to Next.js. Local development uses eve's `withEve` proxy.
+Do not revert to the retired `experimentalServices` configuration.
 
-Model strings resolve through Vercel AI Gateway. For local dev, either link the
-project (`vercel link` then `vercel env pull`) or set `AI_GATEWAY_API_KEY`.
-See `.env.example`.
+The private Blob store contains the KB snapshot and new shared conversations.
+Neon holds inquiry/feedback/report records and creates its tables on first use.
+Model calls use the Clever project's Vercel OIDC identity and AI Gateway billing.
+No personal-account credentials or resources are required.
 
-Test without Discord via the HTTP channel:
+Environment variables: `BLOB_READ_WRITE_TOKEN`, `DATABASE_URL` (or `POSTGRES_URL`),
+`CRON_SECRET`; optional `MCP_API_KEY`, `JINA_API_KEY`, `KB_INDEX_TTL_MS` (default 600000).
+Local Gateway calls can use the pulled `VERCEL_OIDC_TOKEN` or a Clever-owned
+`AI_GATEWAY_API_KEY`. OIDC credentials expire; pull again when needed.
+Discord credentials are optional and have not been copied from the personal demo.
 
-```bash
-curl -X POST http://127.0.0.1:3000/eve/v1/session \
-  -H 'content-type: application/json' \
-  -d '{"message":"What time is it in Tokyo?"}'
-```
+## Corpus refresh
 
-## Connect Discord
+The eve schedule `agent/schedules/refresh-kb.ts` runs daily at **08:00 UTC**.
+Run `npm run kb:refresh` manually after pulling Clever env vars. Both invoke the same
+pipeline. Check `/api/kb/status` for the latest attempt, per-article failures, and
+coverage; `/changelog` shows refresh history. Vercel cron/runtime logs show execution failures.
 
-1. Create an app at <https://discord.com/developers/applications>.
-2. Copy these into `.env` (see `.env.example`):
-   - **Public Key** → `DISCORD_PUBLIC_KEY`
-   - **Application ID** → `DISCORD_APPLICATION_ID`
-   - **Bot → Token** → `DISCORD_BOT_TOKEN`
-3. Register a slash command (use a guild command in dev for instant propagation;
-   the `message` option name is what eve reads as the prompt):
+A single private `kb/snapshot-v2.json` contains article bodies, aligned vectors,
+manifest and changelog. A refresh publishes it only after successful embedding.
+Failed extractions retain prior articles and their original indexing dates. Legacy
+entries without verified complete extraction remain searchable but are rejected by
+the reader. Discovery omissions do not automatically delete known articles; confirmed
+source removals require review. `kb/refresh-status.json` records attempts and failures.
 
-   ```bash
-   curl -X PUT "https://discord.com/api/v10/applications/$DISCORD_APPLICATION_ID/guilds/$GUILD_ID/commands" \
-     -H "Authorization: Bot $DISCORD_BOT_TOKEN" -H "Content-Type: application/json" \
-     -d '[{"name":"ask","description":"Ask the assistant","type":1,
-       "options":[{"name":"message","description":"What should the agent do?","type":3,"required":true}]}]'
-   ```
+Bodies retain Markdown headings, numbered lists, links, and tables. They are never
+truncated for storage. Embedding/reranking budgets are separate. The reader paginates
+at about 16000 UTF-16 code units. Warm processes cache the snapshot for ten minutes;
+they can continue serving the last good snapshot during a transient storage outage.
+Cold reads without storage fail explicitly. Responses report indexing provenance,
+not a claim that the indexed article is live.
 
-4. Deploy (`vercel deploy`), then set the deployment's
-   `https://<your-app>/eve/v1/discord` as the **Interactions Endpoint URL** in the
-   Developer Portal. Discord must be able to reach a public URL, so use a
-   deployment (or a tunnel like `ngrok` over local dev) — not bare localhost.
+## Verification
 
-Then in Discord: `/ask message: summarize https://vercel.com/eve`
-
-## Use it inside Claude & VS Code (MCP)
-
-The support knowledge base is also exposed as a remote **MCP server** at
-`/api/mcp`, so colleagues can query Clever's docs from inside Claude (Desktop /
-web / Enterprise), VS Code (Copilot agent mode), Cursor, or Claude Code — without
-visiting the web app or Discord.
-
-See **[MCP.md](MCP.md)** for setup (including a copy-paste prompt that wires it
-into a VS Code project for you). Tools: `search_clever_kb` and
-`ask_clever_support`. Endpoint shared with the eve agent via
-[`lib/search.ts`](lib/search.ts).
+`node scripts/verify-mcp.mjs https://YOUR-HOST/api/mcp` checks the deployed transport,
+all three tools, structured results, the teacher password procedure, error cases,
+and retrieval latency. Results go in `verification/` without secrets.

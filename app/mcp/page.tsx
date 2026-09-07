@@ -16,7 +16,9 @@ export const metadata = {
     "Connect the Clever Support knowledge base to VS Code over MCP — search and cited answers from inside Copilot agent mode, plus a copy-paste prompt that sets it up for you.",
 };
 
-const MCP_URL = "https://clever-support-agent.vercel.app/api/mcp";
+const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+const SITE_URL = productionHost ? `https://${productionHost}` : "http://localhost:3000";
+const MCP_URL = `${SITE_URL}/api/mcp`;
 
 const WORKSPACE_CONFIG = `{
   "servers": {
@@ -42,16 +44,16 @@ support knowledge base from VS Code.
      }
    }
 2. The server is public — no auth header is needed.
-3. It exposes two tools: search_clever_kb (ranked, cited help-center articles
-   with a confidence score) and ask_clever_support (a synthesized, cited answer).
-   Both answer Clever questions — SSO, rostering, logins, admin setup.
+3. It exposes search_clever_kb (compact ranked results), read_clever_article
+   (full indexed article text with revision-safe pagination), and ask_clever_support
+   (a synthesized, cited answer). Use search plus read for step-by-step guidance.
 4. After writing the file, tell me exactly how to enable the server in Copilot
    agent mode, then verify it connected and list its tools.`;
 
 const TEST_PROMPT = `Using the clever-support tools, how do I set up Google SSO in Clever?
 Give me the steps and cite the help-center article you used.`;
 
-const DOCS_URL = "https://clever-support-agent.vercel.app/mcp";
+const DOCS_URL = `${SITE_URL}/mcp`;
 
 const CLAUDE_CODE_CLI = `claude mcp add --transport http clever-support ${MCP_URL}`;
 
@@ -129,6 +131,10 @@ export default function McpPage() {
                   <span className="font-mono text-xs">search_clever_kb</span> — ranked, cited
                   articles with a calibrated confidence signal.
                 </span>
+              </li>
+              <li className="flex gap-2">
+                <SearchCheckIcon className="mt-0.5 size-4 shrink-0 text-clever-blue" />
+                <span><span className="font-mono text-xs">read_clever_article</span> — full article text with indexing date, revision, and pagination.</span>
               </li>
               <li className="flex gap-2">
                 <SparklesIcon className="mt-0.5 size-4 shrink-0 text-clever-blue" />

@@ -1,7 +1,7 @@
 # 🏆 Clever Support Assistant — Brag Sheet
 
 A support-knowledge agent built on **Vercel eve**, deployed at
-**[clever-support-agent.vercel.app](https://clever-support-agent.vercel.app)**.
+**[clever-support-tom-legers-projects.vercel.app](https://clever-support-tom-legers-projects.vercel.app)**.
 This is the cheat sheet for talking to judges — especially Vercel ones.
 
 ---

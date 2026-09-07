@@ -1,12 +1,12 @@
 import { gateway } from "@ai-sdk/gateway";
 import { embed, rerank } from "ai";
-import { head } from "@vercel/blob";
+import { readJson } from "./blob-json.mjs";
+import { isCompleteArticle } from "./article-contract.mjs";
 import { audienceLabel, audienceOf } from "./audience";
 import {
   EMBED_DIMS,
   EMBED_MODEL,
-  KB_BLOB_PATH,
-  KB_VECTORS_BLOB_PATH,
+  KB_SNAPSHOT_BLOB_PATH,
 } from "./kb-config.mjs";
 // Bundled snapshot — the fallback used when the Blob KB is absent (first deploy,
 // before the refresh schedule has ever run) or temporarily unreadable, so search
@@ -34,7 +34,11 @@ import vectorData from "#data/kb-vectors.json" with { type: "json" };
 // retrievers see clean tokens.
 // Exported so body-lookup callers (the LLM-as-judge batch route) can name the
 // return type of getArticleByUrl; fields are unchanged.
-export type Article = { id: string; url: string; title?: string; text: string };
+export type Article = {
+  id: string; url: string; title?: string; text: string;
+  audience?: string | null; language?: string; indexedAt?: string;
+  sourceUpdatedAt?: string | null; revision?: string; bodyComplete?: boolean;
+};
 
 // EMBED_MODEL / EMBED_DIMS are imported from kb-config.mjs — the single source
 // shared with the embed step, so the query embedding can never drift from the
@@ -204,17 +208,17 @@ function confidenceLevel(top: number | null): "high" | "medium" | "low" | "unsco
   return "low";
 }
 
-function excerpt(text: string, query: string, max = 1100): string {
-  const terms = tokenize(query);
+export function excerpt(text: string, query: string, max = 1100): string {
+  const terms = [...new Set(tokenize(query))];
   const lower = text.toLowerCase();
-  let at = -1;
-  for (const t of terms) {
-    const i = lower.indexOf(t);
-    if (i !== -1 && (at === -1 || i < at)) at = i;
+  let start = 0;
+  let best = -1;
+  for (let at = 0; at < text.length; at += Math.floor(max / 2)) {
+    const window = lower.slice(at, at + max);
+    const score = terms.reduce((sum, term) => sum + (window.includes(term) ? 1 : 0), 0);
+    if (score > best) { best = score; start = at; }
   }
-  const start = at === -1 ? 0 : Math.max(0, at - 150);
-  const slice = text.slice(start, start + max).trim();
-  return (start > 0 ? "…" : "") + slice + (start + max < text.length ? "…" : "");
+  return (start ? "…" : "") + text.slice(start, start + max).trim() + (start + max < text.length ? "…" : "");
 }
 
 export type SearchResultItem = {
@@ -226,6 +230,11 @@ export type SearchResultItem = {
   // Who this article is written for (Admins / Teachers / Families / …),
   // derived from the title. Lets the agent disambiguate by POV.
   audience: string;
+  articleId: string;
+  bodyAvailable: boolean;
+  indexedAt: string | null;
+  language: string;
+  revision: string | null;
 };
 
 // What this single retrieval cost to run through AI Gateway, itemized by stage
@@ -270,20 +279,6 @@ let indexSource: "blob" | "fallback" | "none" = "none";
 let indexLoadedAt = 0;
 let loadInFlight: Promise<void> | null = null;
 
-async function fetchBlobJson<T>(pathname: string): Promise<T | null> {
-  try {
-    // head() resolves the blob's public URL by pathname; we then fetch the body.
-    // (Mirrors lib/blob-shares.ts — get({access:"public"}) 403s this store.)
-    const meta = await head(pathname);
-    const res = await fetch(meta.url, { cache: "no-store" });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    // Object absent (BlobNotFoundError) or a transient read error → null.
-    return null;
-  }
-}
-
 function installFallback(): void {
   currentIndex = makeIndex(kbData as Article[], vectorData as number[][]);
   indexSource = "fallback";
@@ -291,12 +286,11 @@ function installFallback(): void {
 }
 
 async function loadIndex(): Promise<void> {
-  const [kb, vectors] = await Promise.all([
-    fetchBlobJson<Article[]>(KB_BLOB_PATH),
-    fetchBlobJson<number[][]>(KB_VECTORS_BLOB_PATH),
-  ]);
+  const snapshot = await readJson(KB_SNAPSHOT_BLOB_PATH).catch(() => null);
+  const kb = snapshot?.kb as Article[] | undefined;
+  const vectors = snapshot?.vectors as number[][] | undefined;
 
-  if (kb && vectors && kb.length > 0 && vectors.length === kb.length) {
+  if (kb && vectors && kb.length > 0 && vectors.length === kb.length && vectors.every(v => v.length === EMBED_DIMS && v.every(Number.isFinite))) {
     // Atomic swap: build the whole new index, then assign in one statement so an
     // in-flight request that snapshotted the old index keeps a consistent view.
     currentIndex = makeIndex(kb, vectors);
@@ -469,6 +463,11 @@ export async function searchSupport(query: string, limit?: number): Promise<Sear
     rank: rank + 1,
     title: idx.KB[i].title,
     url: idx.KB[i].url,
+    articleId: idx.KB[i].id,
+    bodyAvailable: indexSource === "blob" && isCompleteArticle(idx.KB[i]),
+    indexedAt: idx.KB[i].indexedAt ?? null,
+    language: idx.KB[i].language ?? "en_US",
+    revision: idx.KB[i].revision ?? null,
     excerpt: excerpt(idx.KB[i].text, query),
     // Reranker relevance for this article (0–1), or null when unscored.
     score: scores.has(i) ? round3(scores.get(i) as number) : null,
@@ -510,4 +509,9 @@ export async function searchSupport(query: string, limit?: number): Promise<Sear
     cost,
     results,
   };
+}
+
+export async function articleStorageAvailable(): Promise<boolean> {
+  await ensureIndex();
+  return indexSource === "blob";
 }

@@ -1,10 +1,10 @@
-import { head } from "@vercel/blob";
-import { KB_CHANGELOG_BLOB_PATH, KB_MANIFEST_BLOB_PATH } from "./kb-config.mjs";
+import { readJson } from "./blob-json.mjs";
+import { KB_SNAPSHOT_BLOB_PATH } from "./kb-config.mjs";
 import type { ArticleBrief, ChangelogEntry, KbManifest } from "./kb-types";
 
 // Reads the KB freshness manifest + changelog from Vercel Blob for the /changelog
-// page. Server-side only, eve-free (uses @vercel/blob, same head+fetch pattern as
-// lib/search.ts / lib/blob-shares.ts). Degrades gracefully: if Blob is absent or
+// page. Server-side only, eve-free, reading the same private snapshot as search.
+// Degrades gracefully: if Blob is absent or
 // unreadable (e.g. before the first scheduled sync), returns an "unavailable"
 // status instead of throwing.
 
@@ -16,18 +16,6 @@ export type KbStatus = {
   dims: number | null;
   entries: ChangelogEntry[];
 };
-
-async function readJson<T>(pathname: string): Promise<T | null> {
-  try {
-    const meta = await head(pathname);
-    const res = await fetch(meta.url, { cache: "no-store" });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    // Object absent (BlobNotFoundError) or a transient read error.
-    return null;
-  }
-}
 
 // The changelog is read from Blob, which is effectively untrusted input (a
 // corrupted, manually edited, or version-skewed entry could be missing fields).
@@ -58,10 +46,9 @@ function normalizeEntry(e: unknown): ChangelogEntry | null {
 }
 
 export async function getKbStatus(): Promise<KbStatus> {
-  const [manifest, changelog] = await Promise.all([
-    readJson<KbManifest>(KB_MANIFEST_BLOB_PATH),
-    readJson<unknown[]>(KB_CHANGELOG_BLOB_PATH),
-  ]);
+  const snapshot = await readJson(KB_SNAPSHOT_BLOB_PATH).catch(() => null);
+  const manifest = snapshot?.manifest as KbManifest | undefined;
+  const changelog = snapshot?.changelog;
 
   const entries = Array.isArray(changelog)
     ? changelog.map(normalizeEntry).filter((e): e is ChangelogEntry => e !== null)

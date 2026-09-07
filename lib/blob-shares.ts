@@ -1,8 +1,8 @@
-import { head, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { readJson } from "./blob-json.mjs";
 import type { SharedThreadPayload } from "./shared-thread";
 
-// Persistence for shared thread snapshots, backed by a public Vercel Blob store
-// (clever-shares). One immutable JSON blob per share at a deterministic,
+// Persistence for shared thread snapshots, backed by the Clever-owned private Vercel Blob store. One immutable JSON blob per share at a deterministic,
 // unguessable pathname. All access is server-side; the BLOB_READ_WRITE_TOKEN is
 // read from the environment by @vercel/blob.
 
@@ -19,7 +19,7 @@ function newId(): string {
 export async function saveShare(payload: SharedThreadPayload): Promise<string> {
   const id = newId();
   await put(`${PREFIX}${id}.json`, JSON.stringify(payload), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     contentType: "application/json",
     cacheControlMaxAge: 60 * 60 * 24 * 365, // snapshots never change
@@ -30,12 +30,7 @@ export async function saveShare(payload: SharedThreadPayload): Promise<string> {
 export async function loadShare(id: string): Promise<SharedThreadPayload | null> {
   if (!ID_RE.test(id)) return null;
   try {
-    // head() resolves the blob's public URL by pathname; we then fetch the body.
-    // (get({access:"public"}) 403s against this store — head + fetch is reliable.)
-    const meta = await head(`${PREFIX}${id}.json`);
-    const res = await fetch(meta.url);
-    if (!res.ok) return null;
-    return (await res.json()) as SharedThreadPayload;
+    return await readJson(`${PREFIX}${id}.json`) as SharedThreadPayload | null;
   } catch {
     // Unknown id (BlobNotFoundError) or a transient read error → treat as 404.
     return null;

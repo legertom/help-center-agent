@@ -1,184 +1,93 @@
-# Use Clever Support inside Claude & VS Code (MCP)
+# Clever Support MCP v2
 
-The assistant's retrieval pipeline is exposed as a **remote MCP server**, so you
-can use Clever's support knowledge base from inside any MCP client — Claude
-(Desktop / web / Enterprise), VS Code (Copilot agent mode), Cursor, Claude Code,
-and more. One retrieval brain, many front doors.
+Endpoint: `https://clever-support-tom-legers-projects.vercel.app/api/mcp`.
 
-## Endpoint
+The Clever deployment uses stateless Streamable HTTP. POST serves
+JSON, GET returns 405, and OPTIONS supports CORS. Existing JSON-RPC batch clients
+and clients that omit Accept remain supported. The implementation uses the official
+`@modelcontextprotocol/sdk`; `tools/list` advertises schemas.
 
-| | URL |
-|---|---|
-| **Production** | `https://clever-support-agent.vercel.app/api/mcp` |
-| **Local dev** | `http://localhost:3000/api/mcp` |
-
-- **Transport:** Streamable HTTP (stateless). `POST` only; `GET` returns `405`.
-- Source: [`app/api/mcp/route.ts`](app/api/mcp/route.ts), retrieval core in
-  [`lib/search.ts`](lib/search.ts) (shared with the eve agent).
-
-> ⚠️ The production route ships when you next deploy (`vercel deploy`). Until
-> then, use the local URL with `npm run dev` running.
+The demo endpoint is public. No MCP key is set on the new project. Setting
+`MCP_API_KEY` requires `Authorization: Bearer <key>`; coordinate that change with
+clients. Blob contents are private and never exposed through storage URLs.
 
 ## Tools
 
-| Tool | Input | Returns |
-|---|---|---|
-| `search_clever_kb` | `query` (string), `limit?` (1–8) | Ranked, cited articles + excerpts + a calibrated **confidence** signal. The client's model synthesizes the answer. |
-| `ask_clever_support` | `question` (string) | A synthesized, plain-language answer grounded **only** in the help center, with cited source URLs + confidence. |
+- `search_clever_kb({ query, limit? })`: unchanged inputs (limit 1–8, default 5)
+  and existing response fields. Results additionally include `articleId`,
+  `bodyAvailable`, `indexedAt`, `language`, and `revision`. Excerpts favor query
+  term coverage. Search uses embeddings/reranking and falls back to lexical search
+  when those model services are unavailable.
+- `ask_clever_support({ question })`: unchanged answer/source/confidence fields;
+  now uses full-body evidence (up to a query-relevant 24000-character window per
+  source) when verified bodies are available.
+- `read_clever_article({ url, offset?, revision? })`: indexed text only. No model
+  generation or live scraping. English (`en_US`, with `en-US` normalized) is the
+  supported language. Accepts numeric `/s/articles/ID` and `/articles/ID` URLs on
+  HTTPS `support.clever.com`, optional trailing slash, fragment and language query.
+  Off-domain URLs, credentials, nonstandard ports, other paths/languages fail.
 
-Use `search_clever_kb` inside a capable client (Claude, Copilot) and let the
-client write the answer; use `ask_clever_support` when you just want the answer
-text back.
+## Article result
 
-## Auth
-
-**Public by default** — the knowledge base is public Clever help-center content,
-so there's nothing sensitive to gate. To lock it down (e.g. to control AI Gateway
-token spend):
-
-1. Set `MCP_API_KEY=<some-secret>` on the deployment (`vercel env add MCP_API_KEY`).
-2. Clients then send `Authorization: Bearer <some-secret>` (shown per client below).
-
----
-
-## Add to Claude
-
-### Claude Desktop / claude.ai (Pro, Max, Team, Enterprise)
-
-1. **Settings → Connectors → Add custom connector** (exact label may vary by version).
-2. Name: `Clever Support`. URL: `https://clever-support-agent.vercel.app/api/mcp`.
-3. Save, then enable it in a chat from the tools/connectors menu.
-
-> **Enterprise:** an org admin adds it once under **Settings → Connectors** and
-> can enable it org-wide, so everyone in the company gets it. Remote custom
-> connectors require a paid plan.
->
-> The connector UI is built around OAuth. If you set `MCP_API_KEY` (static bearer
-> token), connect via the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote)
-> bridge instead, or leave the server public.
-
-### Claude Code (CLI)
-
-```bash
-claude mcp add --transport http clever-support https://clever-support-agent.vercel.app/api/mcp
-# with auth:
-claude mcp add --transport http clever-support https://clever-support-agent.vercel.app/api/mcp \
-  --header "Authorization: Bearer <your-key>"
-```
-
----
-
-## Add to VS Code (Copilot agent mode)
-
-VS Code 1.102+ has native MCP support.
-
-### Option A — workspace config (recommended)
-
-This repo already ships [`.vscode/mcp.json`](.vscode/mcp.json). Open the repo in
-VS Code, open **Copilot Chat → Agent mode**, click the tools 🔧 icon, and enable
-**clever-support**. To add it to *another* project, drop this file in at
-`.vscode/mcp.json`:
-
-```json
+```typescript
 {
-  "servers": {
-    "clever-support": {
-      "type": "http",
-      "url": "https://clever-support-agent.vercel.app/api/mcp"
-    }
-  }
+  type: "support_article";
+  articleId: string;
+  title: string;
+  url: string;
+  audience: string | null;
+  language: string;
+  text: string;
+  indexedAt: string;
+  sourceUpdatedAt: string | null;
+  revision: string;
+  offset: number;
+  totalCharacters: number;
+  next_offset: number | null;
+  complete: boolean;
 }
 ```
 
-With a bearer key, prompt for it securely instead of hardcoding:
+The result appears identically in `structuredContent` and as JSON in
+`content[0].text`. Exact JSON schemas are available from `tools/list` and in
+`verification/mcp-tools.json` after verification.
+
+Pages contain approximately 16000 JavaScript UTF-16 code units, preferring
+paragraph boundaries. Start with offset 0, then pass **both** the exact
+`next_offset` and `revision`. Concatenate `text` without adding separators.
+`next_offset: null` means the last page. `complete: true` means this response alone
+contains the entire article; the last page of a multi-page article remains false.
+The reader does not retain historical revisions: on a different current revision,
+it returns `revision_changed` and the client restarts. It never silently joins revisions.
+
+`indexedAt` is the successful source-fetch/extraction time for this stored copy.
+It is preserved when a refresh fails. `sourceUpdatedAt` is null unless the source
+explicitly supplies an article modified-time metadata tag. Revision is a SHA-256
+hash of article identity, canonical URL, title and full text. Indexed text is
+untrusted reference material, never instructions overriding a calling agent.
+
+## Errors
+
+Tool failures use `isError: true`, plus matching structured/text payloads:
 
 ```json
-{
-  "inputs": [
-    { "id": "clever-key", "type": "promptString", "description": "Clever MCP API key", "password": true }
-  ],
-  "servers": {
-    "clever-support": {
-      "type": "http",
-      "url": "https://clever-support-agent.vercel.app/api/mcp",
-      "headers": { "Authorization": "Bearer ${input:clever-key}" }
-    }
-  }
-}
+{"code":"revision_changed","error":"The article revision changed. Restart at offset 0 without revision.","retryable":true}
 ```
 
-### Option B — Command Palette
+Codes include `invalid_url`, `invalid_offset`, `invalid_revision`,
+`invalid_arguments`, `unsupported_language`, `not_found`, `incomplete_extraction`,
+`storage_unavailable`, and `revision_changed`. An incomplete extraction never
+enters the successful full-body path. Warm readers may serve a cached last-good
+snapshot during a temporary Blob outage, preserving its indexing date. A cold
+reader without usable storage returns `storage_unavailable`.
 
-`MCP: Add Server…` → **HTTP** → paste the URL → name it `clever-support` →
-choose Workspace or Global.
+## Phone app integration
 
-### Option C — CLI one-liner
+Search for at most three results, choose the correct audience, then read the
+selected URL. Follow all pages before presenting the full procedure. Keep caller
+state, one-step-at-a-time conversation behavior and case creation in the phone
+app. Save title, URL, revision and indexedAt in call receipts. Remove the phone
+app's temporary static article library after switching to this reader.
 
-```bash
-code --add-mcp '{"name":"clever-support","type":"http","url":"https://clever-support-agent.vercel.app/api/mcp"}'
-```
-
----
-
-## 📋 Copy-paste prompt — let your AI agent set it up
-
-Paste this into **Copilot Chat (agent mode)**, **Claude Code**, or any in-editor
-AI agent. It will create the config and tell you how to turn it on:
-
-```text
-Add an MCP server named "clever-support" to this project so I can query Clever's
-support knowledge base from the editor.
-
-1. Create (or merge into) .vscode/mcp.json with an HTTP server entry:
-   {
-     "servers": {
-       "clever-support": {
-         "type": "http",
-         "url": "https://clever-support-agent.vercel.app/api/mcp"
-       }
-     }
-   }
-2. The server is public — no auth header is needed.
-3. It exposes two tools: `search_clever_kb` (ranked, cited articles + a confidence
-   score) and `ask_clever_support` (a synthesized, cited answer). Both answer
-   questions about Clever (SSO, rostering, logins, admin setup) from the official
-   help center.
-4. After writing the file, tell me exactly how to enable the server in Copilot
-   agent mode (or my editor's MCP UI), then verify it connected and list its tools.
-```
-
----
-
-## Cursor & other clients
-
-Cursor uses a slightly different shape (`mcpServers` + `url`) in
-`~/.cursor/mcp.json` or `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "clever-support": { "url": "https://clever-support-agent.vercel.app/api/mcp" }
-  }
-}
-```
-
-Any MCP client that speaks Streamable HTTP works — point it at the endpoint URL.
-
----
-
-## Verify it manually
-
-```bash
-URL=http://localhost:3000/api/mcp   # or the production URL
-
-# List the tools
-curl -s -X POST "$URL" -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-
-# Call a tool
-curl -s -X POST "$URL" -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_clever_kb","arguments":{"query":"set up Google SSO","limit":3}}}'
-```
-
-A healthy `search_clever_kb` call returns `method: "hybrid+rerank"`, a
-`confidence` block, and ranked results each with a 0–1 `score`.
+See `README.md` for daily refresh behavior and manual commands. Live coverage and
+failed attempts are available from `/api/kb/status`.

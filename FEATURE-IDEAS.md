@@ -13,7 +13,7 @@ eve-native feature ideas to help **Clever support agents — especially new ones
 - **Knowledge base:** `agent/data/kb.json` (article text) + `agent/data/kb-vectors.json` (512-dim embeddings). Built by `scripts/ingest.mjs` (BFS crawl of help center) + `scripts/embed.mjs`.
 - **Interfaces:** Discord bot (`/ask`, one-shot per command) + branded Next.js web chat (`app/`, durable multi-turn sessions, "New chat" reset). `/about` explainer page.
 - **Other:** there's an eval harness referenced in a sibling `clever-dev-docs` repo (`eval/run-eval.ts`) that several features below build on.
-- **Deployed:** `clever-support-agent.vercel.app`.
+- **Deployed:** `clever-support-tom-legers-projects.vercel.app`.
 
 ## eve primitives reference
 

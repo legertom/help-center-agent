@@ -1,0 +1,37 @@
+{
+  "verifiedAt": "2026-09-07T15:04:28.147Z",
+  "manifest": {
+    "count": 534,
+    "completeCount": 532,
+    "dims": 512,
+    "syncedAt": "2026-09-07T14:53:25.964Z",
+    "builtAt": "2026-09-07T14:53:25.964Z",
+    "changedAt": "2026-09-07T14:53:25.964Z",
+    "lastChange": {
+      "added": 534,
+      "removed": 0,
+      "modified": 0,
+      "total": 534
+    },
+    "failedCount": 10,
+    "attemptedAt": "2026-09-07T14:52:29.834Z"
+  },
+  "checks": [
+    {
+      "articleId": "115001975103",
+      "title": "SFTP Syncs: OneRoster",
+      "characters": 126112,
+      "pages": 11,
+      "revision": "a20d02cf3910582e511fd699ab3704695fd40f305ef67d8573ba761483440e7f",
+      "exactReconstruction": true
+    },
+    {
+      "articleId": "000001713",
+      "title": "For Families: Clever's Digital Learning Directory",
+      "characters": 3648,
+      "pages": 1,
+      "revision": "9f76ef05d51f8c545f72a320ac09cbd6ac4bb8b949dcc0c19c7e8704fd5172fb",
+      "exactReconstruction": true
+    }
+  ]
+}
