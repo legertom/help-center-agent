@@ -1,12 +1,11 @@
 import { gateway } from "@ai-sdk/gateway";
 import { embed, rerank } from "ai";
-import { readJson } from "./blob-json.mjs";
+import { readSnapshot } from "./kb-snapshot.mjs";
 import { isCompleteArticle } from "./article-contract.mjs";
 import { audienceLabel, audienceOf } from "./audience";
 import {
   EMBED_DIMS,
   EMBED_MODEL,
-  KB_SNAPSHOT_BLOB_PATH,
 } from "./kb-config.mjs";
 // Bundled snapshot — the fallback used when the Blob KB is absent (first deploy,
 // before the refresh schedule has ever run) or temporarily unreadable, so search
@@ -286,7 +285,7 @@ function installFallback(): void {
 }
 
 async function loadIndex(): Promise<void> {
-  const snapshot = await readJson(KB_SNAPSHOT_BLOB_PATH).catch(() => null);
+  const snapshot = await readSnapshot();
   const kb = snapshot?.kb as Article[] | undefined;
   const vectors = snapshot?.vectors as number[][] | undefined;
 
@@ -313,7 +312,9 @@ async function loadIndex(): Promise<void> {
 }
 
 async function ensureIndex(): Promise<void> {
-  const fresh = currentIndex !== null && Date.now() - indexLoadedAt < INDEX_TTL_MS;
+  // A failed cold read must not disable article bodies for the normal ten-minute TTL.
+  const ttl = indexSource === "fallback" ? Math.min(INDEX_TTL_MS, 30_000) : INDEX_TTL_MS;
+  const fresh = currentIndex !== null && Date.now() - indexLoadedAt < ttl;
   if (fresh) return;
   // Coalesce concurrent (re)loads so a warm instance issues one Blob read, not N.
   if (!loadInFlight) {
