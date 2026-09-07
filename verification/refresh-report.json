@@ -1,0 +1,104 @@
+{
+  "triggerStatus": 200,
+  "durationMs": 76649,
+  "before": {
+    "count": 534,
+    "completeCount": 532,
+    "dims": 512,
+    "syncedAt": "2026-09-07T14:53:25.964Z",
+    "builtAt": "2026-09-07T14:53:25.964Z",
+    "changedAt": "2026-09-07T14:53:25.964Z",
+    "lastChange": {
+      "added": 534,
+      "removed": 0,
+      "modified": 0,
+      "total": 534
+    },
+    "failedCount": 10,
+    "attemptedAt": "2026-09-07T14:52:29.834Z"
+  },
+  "after": {
+    "attemptedAt": "2026-09-07T15:03:57.109Z",
+    "finishedAt": "2026-09-07T15:05:12.797Z",
+    "status": "partial",
+    "manifest": {
+      "count": 534,
+      "completeCount": 532,
+      "dims": 512,
+      "syncedAt": "2026-09-07T15:05:12.797Z",
+      "builtAt": "2026-09-07T15:05:12.797Z",
+      "changedAt": "2026-09-07T14:53:25.964Z",
+      "lastChange": {
+        "added": 534,
+        "removed": 0,
+        "modified": 0,
+        "total": 534
+      },
+      "failedCount": 10,
+      "attemptedAt": "2026-09-07T15:03:57.109Z"
+    },
+    "failures": [
+      {
+        "articleId": "000001577",
+        "code": "extraction_failed",
+        "retained": true,
+        "attemptedAt": "2026-09-07T15:04:56.417Z"
+      },
+      {
+        "articleId": "000001550",
+        "code": "extraction_failed",
+        "retained": true,
+        "attemptedAt": "2026-09-07T15:05:01.309Z"
+      },
+      {
+        "articleId": "000001536",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:04.697Z"
+      },
+      {
+        "articleId": "360031060451",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:04.697Z"
+      },
+      {
+        "articleId": "360049821892",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:07.015Z"
+      },
+      {
+        "articleId": "000001538",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:07.015Z"
+      },
+      {
+        "articleId": "206618765",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:07.015Z"
+      },
+      {
+        "articleId": "206092427",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:07.015Z"
+      },
+      {
+        "articleId": "115005166483",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:07.015Z"
+      },
+      {
+        "articleId": "360001036226",
+        "code": "extraction_failed",
+        "retained": false,
+        "attemptedAt": "2026-09-07T15:05:07.015Z"
+      }
+    ]
+  },
+  "confirmedPublicationChanged": true
+}
